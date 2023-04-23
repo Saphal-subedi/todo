@@ -25,7 +25,7 @@ class MyApp extends StatelessWidget {
 }
 
 class Safal extends StatefulWidget {
-  Safal({super.key});
+  const Safal({super.key});
 
   @override
   State<Safal> createState() => _SafalState();
@@ -35,10 +35,18 @@ class _SafalState extends State<Safal> {
   TextEditingController titleController = TextEditingController();
 
   TextEditingController subTitle = TextEditingController();
+
   @override
   void initState() {
     super.initState();
-    DatabaseTodoService().readDatabase();
+    _fetchDataFromDatabase();
+  }
+
+  Future<void> _fetchDataFromDatabase() async {
+    final data = await DatabaseTodoService().readDatabase();
+    setState(() {
+      safal = data;
+    });
   }
 
   @override
@@ -48,18 +56,22 @@ class _SafalState extends State<Safal> {
           itemBuilder: (context, index) {
             return ListTile(
               trailing: IconButton(
-                icon: Icon(Icons.delete),
-                onPressed: () {},
+                icon: const Icon(Icons.delete),
+                onPressed: () async {
+                  await DatabaseTodoService().delete(safal[index].id!);
+                  safal.removeAt(index);
+                  setState(() {});
+                },
               ),
-              title: Text(titleController.text[index]),
-              subtitle: Text(subTitle.text[index]),
+              title: Text(safal[index].title),
+              subtitle: Text(safal[index].subtitle),
               leading: Checkbox(
                 value: false,
                 onChanged: ((value) {}),
               ),
             );
           },
-          separatorBuilder: (context, index) => SizedBox(height: 10),
+          separatorBuilder: (context, index) => const SizedBox(height: 10),
           itemCount: safal.length),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
@@ -81,43 +93,49 @@ class _SafalState extends State<Safal> {
                     controller: subTitle,
                     decoration: InputDecoration(
                         hintText: "subtitle",
-                        focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(20)),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(20)),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(20),
                         )),
                   ),
                   TextButton(
-                      onPressed: () {
-                        DatabaseTodoService().insert(saphal(
-                          title: titleController.text,
-                          date: DateTime.now().toString(),
-                          subtitle: subTitle.text,
-                        ));
+                      onPressed: () async {
                         Navigator.pop(context);
+                        final id = DatabaseTodoService().insert(
+                          Saphal(
+                            title: titleController.text,
+                            date: DateTime.now().toString(),
+                            subtitle: subTitle.text,
+                          ),
+                        );
+
+                        List<Saphal> items = await DatabaseTodoService().readDatabase();
+                        setState(() {
+                          safal = items;
+                        });
+                        titleController.clear();
+                        subTitle.clear();
                       },
-                      child: Text("Add contain")),
+                      child: const Text("Add contain")),
                 ],
               );
             },
           );
         },
-        child: Icon(Icons.add),
+        child: const Icon(Icons.add),
       ),
     );
   }
 }
 
-class saphal {
+class Saphal {
   int? id;
   String title;
   String date;
   String subtitle;
-  saphal(
-      {required this.title,
-      required this.date,
-      required this.subtitle,
-      this.id});
+
+  Saphal({required this.title, required this.date, required this.subtitle, this.id});
+
   Map<String, dynamic> toMap() {
     return {
       'title': title,
@@ -127,33 +145,31 @@ class saphal {
   }
 }
 
-List<saphal> safal = [];
+List<Saphal> safal = [];
 
 class DatabaseTodoService {
   Future<Database> connectDb() async {
-    var database = await openDatabase(
-        join(await getDatabasesPath(), 'saphal.db'),
-        version: 1, onCreate: (
+    var database = await openDatabase(join(await getDatabasesPath(), 'saphal.db'), version: 1, onCreate: (
       db,
       version,
     ) {
-      db.execute(
-          'CREATE TABLE tabletodo(id INTEGER PRIMARY KEY,title TEXT,date TEXT,subtitle TEXT)');
+      db.execute('CREATE TABLE tabletodo(id INTEGER PRIMARY KEY,title TEXT,date TEXT,subtitle TEXT)');
     }, onConfigure: onConfigure);
-    if (database != null) {
-      print('Database connected successfully ');
-      return database;
-    } else {
-      print('Unable to connect to database ');
-      return database;
-    }
+    // if (database != null) {
+    //   print('Database connected successfully ');
+    //   return database;
+    // } else {
+    //   print('Unable to connect to database ');
+    //   return database;
+    // }
+    return database;
   }
 
   onConfigure(Database db) async {
     await db.execute("PRAGMA foreign_keys = ON");
   }
 
-  insert(saphal s) async {
+  insert(Saphal s) async {
     final db = await connectDb();
     db.insert(
       'tableTodo',
@@ -161,21 +177,21 @@ class DatabaseTodoService {
     );
   }
 
-  Future<List<saphal>> readDatabase() async {
+  Future<List<Saphal>> readDatabase() async {
     final db = await connectDb();
-    final dbread = await db.query('tabletodo');
-    return List.generate(dbread.length, (index) {
-      return saphal(
-        id: dbread[index]['id'] as int,
-        title: dbread[index]['title'] as String,
-        subtitle: dbread[index]['subtitle'] as String,
-        date: dbread[index]['date'] as String,
+    final dbRead = await db.query('tabletodo');
+    return List.generate(dbRead.length, (index) {
+      return Saphal(
+        id: dbRead[index]['id'] as int,
+        title: dbRead[index]['title'] as String,
+        subtitle: dbRead[index]['subtitle'] as String,
+        date: dbRead[index]['date'] as String,
       );
     });
   }
-}
 
-// delete(int id) async {
-//   final db = DatabaseTodoService().connectDb();
-//   await db.delete('tabletodo', where: 'id=?', whereArgs: [id]);
-// }
+  delete(int id) async {
+    final db = await DatabaseTodoService().connectDb();
+    await db.delete('tabletodo', where: 'id=?', whereArgs: [id]);
+  }
+}
